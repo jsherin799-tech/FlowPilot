@@ -39,6 +39,11 @@
   ],
   "exclude": [
     "node_modules",
-    "e2e"
+    "e2e",
+    "playwright.config.ts",
+    "src/controllers/**/*",
+    "src/routes/**/*",
+    "src/middleware/**/*",
+    "src/validators/**/*"
   ]
 }
