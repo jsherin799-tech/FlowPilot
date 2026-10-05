@@ -10,4 +10,4 @@ test.describe('FlowPilot E2E Tests', () => {
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
     await expect(page.getByRole('heading', { name: 'Project board' })).toBeVisible();
   });
-});
+})
