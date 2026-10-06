@@ -47,9 +47,6 @@ app.use(
   })
 );
 
-// Explicitly handle OPTIONS preflight requests globally
-app.options('*', cors());
-
 app.use(express.json());
 
 // Health Check Endpoint (Includes DB Verification)
