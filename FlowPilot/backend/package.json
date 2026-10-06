@@ -2,11 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "FlowPilot SaaS Backend Engine API",
-  "main": "src/app.ts",
+  "main": "dist/app.js",
   "scripts": {
-  "build": "tsc -p .",
-  "start": "node dist/index.js"
-},
+    "build": "tsc",
+    "start": "node dist/app.js"
+  },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
