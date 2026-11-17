@@ -7,6 +7,9 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
 enum Role {
   ADMIN
   PROJECT_MANAGER
@@ -29,51 +32,344 @@ enum TaskStatus {
   DONE
 }
 
+enum BugStatus {
+  OPEN
+  IN_PROGRESS
+  FIXED
+  RETEST
+  REOPENED
+  RESOLVED
+  CLOSED
+  WONT_FIX
+}
+
+enum BugSeverity {
+  BLOCKER
+  CRITICAL
+  MAJOR
+  MINOR
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_STATUS_UPDATED
+  BUG_REPORTED
+  BUG_RESOLVED
+  SPRINT_STARTED
+  SPRINT_COMPLETED
+  COMMENT_ADDED
+  MEMBER_ADDED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
   name      String
   role      Role     @default(DEVELOPER)
+  isActive  Boolean  @default(true)
+  avatarUrl String?
+  bio       String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  tasks     Task[]
-  bugs      Bug[]
+
+  // Relations
+  assignedTasks    Task[]           @relation("TaskAssignee")
+  qaAssignedTasks  Task[]           @relation("TaskQAAssignee")
+  reportedBugs     Bug[]            @relation("BugReporter")
+  assignedBugs     Bug[]            @relation("BugAssignee")
+  managedProjects  Project[]        @relation("ProjectManager")
+  comments         Comment[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  projectMembers   ProjectMember[]
+  aiConversations  AIConversation[]
+  adminAuditEvents AdminAuditLog[]
+  taskEffortLogs   TaskEffortLog[]
+}
+
+model Organization {
+  id                   String        @id @default(uuid())
+  name                 String
+  slug                 String        @unique
+  logoUrl              String?
+  timezone             String        @default("UTC")
+  dateFormat           String        @default("yyyy-MM-dd")
+  language             String        @default("en")
+  defaultProjectStatus ProjectStatus @default(ACTIVE)
+  defaultRole          Role          @default(DEVELOPER)
+  invitePolicy         String        @default("ADMIN_ONLY")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  projects Project[]
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  action     String
+  targetType String
+  targetId   String
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
 }
 
 model Project {
-  id          String   @id @default(uuid())
+  id             String        @id @default(uuid())
+  name           String
+  key            String?       @unique
+  description    String?
+  status         ProjectStatus @default(ACTIVE)
+  startDate      DateTime?
+  endDate        DateTime?
+  organizationId String?
+  pmId           String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // Relations
+  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  manager         User?            @relation("ProjectManager", fields: [pmId], references: [id], onDelete: SetNull)
+  tasks           Task[]
+  bugs            Bug[]
+  sprints         Sprint[]
+  milestones      Milestone[]
+  members         ProjectMember[]
+  activityLogs    ActivityLog[]
+  aiConversations AIConversation[]
+
+  @@index([pmId])
+}
+
+model Milestone {
+  id          String    @id @default(uuid())
   name        String
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tasks       Task[]
-  bugs        Bug[]
+  isComplete  Boolean   @default(false)
+  startDate   DateTime?
+  endDate     DateTime?
+  projectId   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([projectId, endDate])
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  role      Role     @default(DEVELOPER)
+  joinedAt  DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model Sprint {
+  id        String       @id @default(uuid())
+  name      String
+  goal      String?
+  status    SprintStatus @default(PLANNED)
+  startDate DateTime?
+  endDate   DateTime?
+  projectId String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
 }
 
 model Task {
-  id          String     @id @default(uuid())
-  title       String
-  description String?
-  status      TaskStatus @default(TO_DO)
-  priority    Priority   @default(MEDIUM)
-  projectId   String
-  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assigneeId  String?
-  assignee    User?      @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id             String     @id @default(uuid())
+  title          String
+  description    String?
+  status         TaskStatus @default(TO_DO)
+  priority       Priority   @default(MEDIUM)
+  storyPoints    Int?
+  estimatedHours Float?
+  actualHours    Float      @default(0)
+  pullRequestUrl String?
+  sortOrder      Int        @default(0)
+  tags           String[]   @default([])
+  dueDate        DateTime?
+  projectId      String
+  milestoneId    String?
+  sprintId       String?
+  assigneeId     String?
+  qaAssigneeId   String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone      Milestone?          @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  sprint         Sprint?             @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  assignee       User?               @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  qaAssignee     User?               @relation("TaskQAAssignee", fields: [qaAssigneeId], references: [id], onDelete: SetNull)
+  comments       Comment[]
+  activityLogs   ActivityLog[]
+  checklistItems TaskChecklistItem[]
+  effortLogs     TaskEffortLog[]
+  bugs           Bug[]
+
+  @@index([projectId, milestoneId])
+  @@index([projectId, assigneeId])
+  @@index([projectId, qaAssigneeId])
+}
+
+model TaskChecklistItem {
+  id         String   @id @default(uuid())
+  title      String
+  isComplete Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  taskId     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, sortOrder])
+}
+
+model TaskEffortLog {
+  id        String   @id @default(uuid())
+  hours     Float
+  note      String?
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Bug {
-  id          String   @id @default(uuid())
-  title       String
-  description String
-  severity    Priority @default(HIGH)
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  reporterId  String?
-  reporter    User?    @relation(fields: [reporterId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String      @id @default(uuid())
+  title             String
+  description       String
+  severity          BugSeverity @default(MAJOR)
+  priority          Priority    @default(HIGH)
+  status            BugStatus   @default(OPEN)
+  reproductionSteps String?
+  expectedResult    String?
+  actualResult      String?
+  attachments       String[]    @default([])
+  environment       String?
+  browser           String?
+  os                String?
+  resolutionNotes   String?
+  pullRequestUrl    String?
+  commitHash        String?
+  projectId         String
+  taskId            String?
+  reporterId        String?
+  assigneeId        String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task         Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reporter     User?         @relation("BugReporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  assignee     User?         @relation("BugAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  comments     Comment[]
+  activityLogs ActivityLog[]
+
+  @@index([taskId])
+  @@index([projectId, assigneeId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  taskId    String?
+  bugId     String?
+  parentId  String?
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task    Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  bug     Bug?      @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([parentId, createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  userId    String
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  action     String
+  entityType String
+  entityId   String
+  entityName String?
+  details    Json?
+  userId     String
+  projectId  String?
+  taskId     String?
+  bugId      String?
+  createdAt  DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  bug     Bug?     @relation(fields: [bugId], references: [id], onDelete: Cascade)
+}
+
+model AIConversation {
+  id        String   @id @default(uuid())
+  title     String
+  messages  Json
+  projectId String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 }

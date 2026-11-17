@@ -1,0 +1,12 @@
+ALTER TABLE "Bug"
+ADD COLUMN "expectedResult" TEXT,
+ADD COLUMN "actualResult" TEXT,
+ADD COLUMN "attachments" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN "taskId" TEXT;
+
+CREATE INDEX "Bug_taskId_idx" ON "Bug"("taskId");
+
+ALTER TABLE "Bug"
+ADD CONSTRAINT "Bug_taskId_fkey"
+FOREIGN KEY ("taskId") REFERENCES "Task"("id")
+ON DELETE SET NULL ON UPDATE CASCADE;

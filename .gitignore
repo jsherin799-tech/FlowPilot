@@ -1,0 +1,27 @@
+# Dependencies and generated build output
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/coverage/
+**/playwright-report/
+/FlowPilot/frontend/test-results/
+
+# Local environment and secrets
+**/.env
+**/.env.*
+**/.env*
+!.env.example
+!**/.env.example
+
+# Local logs and databases
+*.log
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+/FlowPilot/postgres-data/
+
+# Local tooling
+.DS_Store
+Thumbs.db

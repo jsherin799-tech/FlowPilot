@@ -1,0 +1,16 @@
+{
+  "name": "flowpilot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "dev:frontend": "npm --prefix FlowPilot/frontend run dev",
+    "dev:backend": "npm --prefix FlowPilot/backend run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "npm --prefix FlowPilot/frontend run build",
+    "build:backend": "npm --prefix FlowPilot/backend run build",
+    "start": "node scripts/start.js",
+    "start:frontend": "npm --prefix FlowPilot/frontend run start",
+    "start:backend": "npm --prefix FlowPilot/backend run start"
+  }
+}
